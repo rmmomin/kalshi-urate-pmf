@@ -2,7 +2,7 @@
 
 Extract risk-neutral probability distributions over the U.S. unemployment rate from [Kalshi](https://kalshi.com) prediction-market prices, compare them to the [Chicago Fed Real-Time Unemployment Rate](https://www.chicagofed.org/research/data/real-time-unemployment-rate) model, and apply exponential tilting / CDF-shift sensitivity analysis.
 
-Distributions are constructed using the methodology described in [Diercks, Katz, and Wright (2025), "Surveys, Prediction Markets, and Economic Forecasting," NBER Working Paper 34702](https://www.nber.org/papers/w34702). Contract prices from the full strike surface are treated as risk-neutral exceedance probabilities, monotonicity is enforced, and the exceedance curve is differenced to recover a discrete PMF over unemployment outcomes.
+Distributions are constructed using the methodology described in [Diercks, Katz, and Wright (2026), "Kalshi and the Rise of Macro Markets," NBER Working Paper 34702](https://www.nber.org/papers/w34702). Contract prices from the full strike surface are treated as risk-neutral exceedance probabilities, monotonicity is enforced, and the exceedance curve is differenced to recover a discrete PMF over unemployment outcomes.
 
 ## Quick Start
 
@@ -118,4 +118,4 @@ python -m src.build_distribution \
 
 ## References
 
-- Diercks, A., Katz, J., and Wright, J. (2025). "Surveys, Prediction Markets, and Economic Forecasting." NBER Working Paper 34702. https://www.nber.org/papers/w34702
+- Diercks, A., Katz, J., and Wright, J. (2026). "Kalshi and the Rise of Macro Markets." NBER Working Paper 34702. https://www.nber.org/papers/w34702
