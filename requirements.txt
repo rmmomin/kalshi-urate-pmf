@@ -1,0 +1,7 @@
+numpy
+pandas
+matplotlib
+requests
+cryptography
+python-dotenv
+openpyxl
