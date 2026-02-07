@@ -133,6 +133,20 @@ def load_from_csv(path: str) -> tuple[np.ndarray, np.ndarray, str | None]:
     return thresholds, prices, ts
 
 
+def load_from_strike_csv(path: str) -> tuple[np.ndarray, np.ndarray, str]:
+    """Load a Kalshi strike snapshot CSV (long format with strike/yes_price columns).
+
+    This format is produced by get_strike_surface() and saved to data/raw/.
+
+    Returns (strikes, prices_cents, asof_timestamp).
+    """
+    df = pd.read_csv(path)
+    strikes = df["strike"].values
+    prices = df["yes_price"].values
+    asof = df["asof_timestamp"].iloc[0]
+    return strikes, prices, asof
+
+
 def load_from_api(event_ticker: str, raw_dir: str | None = None) -> tuple[np.ndarray, np.ndarray, str]:
     """Pull live strike surface from Kalshi API.
 

@@ -26,11 +26,16 @@ from src.build_distribution import (
     export_results,
     load_from_api,
     load_from_csv,
+    load_from_strike_csv,
 )
 from src.plotting import (
+    bbg_to_7cat,
+    load_bbg_consensus,
     load_chicago_fed_probs,
+    plot_bbg_consensus_histogram,
     plot_combined_lines,
     plot_comparison,
+    plot_kalshi_chifed_bbg,
     plot_kalshi_only,
     plot_temporal_comparison,
     plot_tilted_comparison,
@@ -50,7 +55,9 @@ from src.utils import DEFAULT_BASELINE, aggregate_to_categories
 EVENT_TICKER = "KXU3-26JAN"
 BASELINE = DEFAULT_BASELINE
 CHICAGO_FED_PATH = "data/raw/chi-labor-market-indicators.xlsx"
+BBG_CONSENSUS_PATH = "data/raw/bbg-consensus-forecast.xlsx"
 HISTORY_CSV = "data/raw/kalshi-price-history-kxu3-26jan-day.csv"
+FEB2_SNAPSHOT = "data/raw/kalshi_strikes_20260202T011445Z.csv"
 OUTDIR = "data/processed"
 FIG_DIR = "figures"
 TILT_LAMBDA = -0.50
@@ -139,14 +146,40 @@ def run(
         save_path=str(fig_dir / f"kalshi_combined_lines_{asof_tag}.png"),
     )
 
-    # (e) Temporal comparison (Jan 30 CSV vs current) — only when live
+    # (e) Temporal comparison (Jan 30, Feb 2, current) — only when live
     if not offline:
-        strikes_old, prices_old, ts_old = load_from_csv(HISTORY_CSV)
-        res_old = build_distribution(strikes_old, prices_old, baseline=baseline, timestamp=ts_old)
+        # Jan 30 snapshot (wide format CSV)
+        strikes_jan30, prices_jan30, ts_jan30 = load_from_csv(HISTORY_CSV)
+        res_jan30 = build_distribution(strikes_jan30, prices_jan30, baseline=baseline, timestamp=ts_jan30)
+
+        # Feb 2 snapshot (long format CSV)
+        strikes_feb2, prices_feb2, ts_feb2 = load_from_strike_csv(FEB2_SNAPSHOT)
+        res_feb2 = build_distribution(strikes_feb2, prices_feb2, baseline=baseline, timestamp=ts_feb2)
+
         plot_temporal_comparison(
-            res_old=res_old, res_new=res, baseline=baseline,
+            results=[res_jan30, res_feb2, res],
+            baseline=baseline,
             save_path=str(fig_dir / f"kalshi_temporal_{asof_tag}.png"),
         )
+
+    # (f) Bloomberg consensus histogram
+    plot_bbg_consensus_histogram(
+        xlsx_path=BBG_CONSENSUS_PATH,
+        save_path=str(fig_dir / f"bbg_consensus_{asof_tag}.png"),
+    )
+
+    # (g) Combined Kalshi + Chicago Fed + BBG consensus chart
+    bbg_df = load_bbg_consensus(BBG_CONSENSUS_PATH)
+    bbg_7cat = bbg_to_7cat(bbg_df, res.categories)
+    plot_kalshi_chifed_bbg(
+        kalshi_probs=res.category_probs,
+        model_probs=chifed,
+        bbg_probs=bbg_7cat,
+        categories=res.categories,
+        baseline=baseline,
+        asof=res.asof,
+        save_path=str(fig_dir / f"kalshi_chifed_bbg_{asof_tag}.png"),
+    )
 
     print(f"\nFigures saved to {fig_dir}/")
     print("Done.")

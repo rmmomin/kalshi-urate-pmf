@@ -17,7 +17,7 @@ from src.utils import CHANGE_LABELS, DEFAULT_BASELINE, build_dual_labels
 # ------------------------------------------------------------------
 # Chicago Fed loader
 # ------------------------------------------------------------------
-def load_chicago_fed_probs(xlsx_path: str, release: str = "advance") -> np.ndarray:
+def load_chicago_fed_probs(xlsx_path: str, release: str = "final") -> np.ndarray:
     """Load the latest 1-month forecast probabilities from Chicago Fed Excel.
 
     Returns a 7-element array (in percentage points, e.g. [8.3, 14.2, ...]).
@@ -299,76 +299,224 @@ def plot_combined_lines(
 
 
 # ------------------------------------------------------------------
-# Temporal comparison plot (two Kalshi snapshots)
+# Temporal comparison plot (multiple Kalshi snapshots)
 # ------------------------------------------------------------------
 def plot_temporal_comparison(
-    res_old,
-    res_new,
+    results: list,
     baseline: float = DEFAULT_BASELINE,
     save_path: str | None = None,
 ) -> plt.Figure:
-    """Compare two Kalshi distribution snapshots over time.
+    """Compare multiple Kalshi distribution snapshots over time.
 
     Parameters
     ----------
-    res_old, res_new : DistributionResult
-        Earlier and later snapshots to compare.
+    results : list of DistributionResult
+        Snapshots to compare (oldest to newest).
     """
+    if len(results) < 2:
+        raise ValueError("Need at least 2 results for temporal comparison")
+
+    # Color palette for multiple series
+    colors = ["blue", "red", "green", "purple", "orange", "brown"]
+
     fig, ax = plt.subplots(figsize=(13, 6))
-    x = np.arange(len(res_old.categories))
-    dual = build_dual_labels(res_old.categories, baseline)
+    x = np.arange(len(results[0].categories))
+    dual = build_dual_labels(results[0].categories, baseline)
 
-    date_old = res_old.asof[:10]
-    date_new = res_new.asof[:10]
+    dates = [res.asof[:10] for res in results]
 
-    ax.plot(x, res_old.category_probs * 100, "b-o", markersize=7, linewidth=2,
-            label=f"Kalshi ({date_old})")
-    ax.plot(x, res_new.category_probs * 100, "r-o", markersize=7, linewidth=2,
-            label=f"Kalshi ({date_new})")
+    # Plot each series
+    for i, res in enumerate(results):
+        color = colors[i % len(colors)]
+        ax.plot(x, res.category_probs * 100, f"-o", color=color,
+                markersize=7, linewidth=2, label=f"Kalshi ({dates[i]})")
 
-    # Percentage labels
-    for xi, (p_old, p_new) in enumerate(
-        zip(res_old.category_probs, res_new.category_probs)
-    ):
-        offset = 0.8
-        ax.text(xi, p_old * 100 + offset, f"{p_old*100:.1f}%",
-                ha="center", va="bottom", fontsize=8, color="blue")
-        ax.text(xi, p_new * 100 + offset, f"{p_new*100:.1f}%",
-                ha="center", va="bottom", fontsize=8, color="red")
+    # Percentage labels for each series
+    for i, res in enumerate(results):
+        color = colors[i % len(colors)]
+        for xi, prob in enumerate(res.category_probs):
+            offset = 0.8 + i * 0.6  # Stagger labels vertically
+            ax.text(xi, prob * 100 + offset, f"{prob*100:.1f}%",
+                    ha="center", va="bottom", fontsize=8, color=color)
 
     ax.set_xticks(x)
     ax.set_xticklabels(dual, fontsize=9)
     ax.set_ylabel("Probability (%)", fontsize=11)
     ax.grid(axis="y", linestyle="--", alpha=0.3)
 
+    # Build title from dates
+    date_str = " vs ".join(dates)
     ax.set_title(
         "Kalshi-Implied Unemployment Distribution Over Time\n"
-        f"{date_old} vs {date_new}",
+        f"{date_str}",
         fontsize=12, fontweight="bold",
     )
     ax.legend(loc="upper right", fontsize=10, framealpha=0.95)
-
-    # Summary stats box
-    delta_mean_bps = (res_new.mean - res_old.mean) * 100
-    box_lines = [
-        f"{date_old}:  mean={res_old.mean:.3f}%"
-        f"  dec={res_old.prob_decrease*100:.1f}%"
-        f"  inc={res_old.prob_increase*100:.1f}%",
-        f"{date_new}:  mean={res_new.mean:.3f}%"
-        f"  dec={res_new.prob_decrease*100:.1f}%"
-        f"  inc={res_new.prob_increase*100:.1f}%",
-        f"\u0394 mean: {delta_mean_bps:+.1f} bps",
-    ]
-    bbox_props = dict(
-        boxstyle="round,pad=0.5", facecolor="lightyellow",
-        edgecolor="gray", alpha=0.9,
-    )
-    ax.text(0.02, 0.97, "\n".join(box_lines), transform=ax.transAxes,
-            fontsize=8.5, va="top", ha="left", bbox=bbox_props, family="monospace")
 
     fig.tight_layout()
     if save_path:
         Path(save_path).parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(save_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    return fig
+
+
+# ------------------------------------------------------------------
+# Bloomberg consensus histogram
+# ------------------------------------------------------------------
+def load_bbg_consensus(xlsx_path: str) -> pd.DataFrame:
+    """Load Bloomberg consensus forecast data from Excel.
+
+    Returns DataFrame with columns: forecast, count, share
+    """
+    return pd.read_excel(xlsx_path, sheet_name="Sheet1")
+
+
+def plot_bbg_consensus_histogram(
+    xlsx_path: str,
+    save_path: str | None = None,
+) -> plt.Figure:
+    """Bar chart of Bloomberg analyst unemployment rate forecasts.
+
+    Parameters
+    ----------
+    xlsx_path : str
+        Path to the Bloomberg consensus forecast Excel file.
+
+    Returns
+    -------
+    plt.Figure
+    """
+    df = load_bbg_consensus(xlsx_path)
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    x = np.arange(len(df))
+    bars = ax.bar(x, df["count"], color="steelblue", edgecolor="navy", linewidth=1.2)
+
+    # Count labels on bars
+    for bar, count in zip(bars, df["count"]):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 0.5,
+            str(int(count)),
+            ha="center", va="bottom", fontsize=11, fontweight="bold",
+        )
+
+    # X-axis labels
+    labels = [f"{rate:.1f}%" for rate in df["forecast"]]
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=11)
+
+    ax.set_xlabel("Unemployment Rate Forecast", fontsize=11)
+    ax.set_ylabel("Number of Forecasters", fontsize=11)
+    ax.set_title("Bloomberg Consensus Unemployment Rate Forecasts", fontsize=13, fontweight="bold")
+    ax.grid(axis="y", linestyle="--", alpha=0.4)
+
+    # Set y-axis to start at 0
+    ax.set_ylim(bottom=0)
+
+    fig.tight_layout()
+    if save_path:
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save_path, dpi=200)
+    plt.close(fig)
+    return fig
+
+
+# ------------------------------------------------------------------
+# BBG consensus to 7-category converter
+# ------------------------------------------------------------------
+def bbg_to_7cat(bbg_df: pd.DataFrame, categories: list[str]) -> np.ndarray:
+    """Convert BBG consensus (3 rates) to 7-category probability array.
+
+    Maps BBG shares to matching category indices, fills others with 0.
+
+    Parameters
+    ----------
+    bbg_df : DataFrame with columns 'forecast' and 'share'
+    categories : list of 7 category labels (e.g., ['≤4.1%', '4.2%', ...])
+
+    Returns
+    -------
+    np.ndarray of shape (7,) with BBG shares at matching positions
+    """
+    result = np.zeros(len(categories))
+
+    for _, row in bbg_df.iterrows():
+        rate = row["forecast"]
+        share = row["share"]
+        # Find matching category by rate value
+        target_label = f"{rate:.1f}%"
+        for i, cat in enumerate(categories):
+            if target_label in cat:
+                result[i] = share
+                break
+
+    return result
+
+
+# ------------------------------------------------------------------
+# Combined Kalshi + Chicago Fed + BBG consensus chart
+# ------------------------------------------------------------------
+def plot_kalshi_chifed_bbg(
+    kalshi_probs: np.ndarray,
+    model_probs: np.ndarray,
+    bbg_probs: np.ndarray,
+    categories: list[str],
+    baseline: float = DEFAULT_BASELINE,
+    asof: str = "",
+    save_path: str | None = None,
+) -> plt.Figure:
+    """Combined chart: Kalshi and Chicago Fed lines with BBG consensus bars.
+
+    Parameters
+    ----------
+    kalshi_probs : 7-element array of Kalshi probabilities
+    model_probs : 7-element array of Chicago Fed model probabilities
+    bbg_probs : 7-element array of BBG consensus probabilities (0s where missing)
+    categories : list of category labels
+    baseline : reference unemployment rate
+    asof : timestamp string for title
+    save_path : optional path to save figure
+    """
+    fig, ax = plt.subplots(figsize=(14, 7))
+    x = np.arange(len(categories))
+    dual = build_dual_labels(categories, baseline)
+
+    # --- BBG consensus bars (semi-transparent, behind lines) ---
+    # Only plot bars where BBG has data (non-zero)
+    bar_mask = bbg_probs > 0
+    ax.bar(x[bar_mask], bbg_probs[bar_mask] * 100, color="green", alpha=0.4,
+           width=0.6, label="BBG Consensus", zorder=2, edgecolor="darkgreen")
+
+    # --- Kalshi (solid red line) ---
+    ax.plot(x, kalshi_probs * 100, "r-o", markersize=8, linewidth=2.5,
+            label="Kalshi", zorder=4)
+
+    # --- Chicago Fed model (solid blue line) ---
+    ax.plot(x, model_probs * 100, "b-o", markersize=8, linewidth=2.5,
+            label="Chicago Fed model", zorder=4)
+
+    # Axes
+    ax.set_xticks(x)
+    ax.set_xticklabels(dual, fontsize=10)
+    ax.set_ylabel("Probability (%)", fontsize=12)
+    ax.grid(axis="y", linestyle="--", alpha=0.3)
+
+    # Title
+    date_str = asof[:10] if asof else ""
+    ax.set_title(
+        f"January 2026 Unemployment Rate: Kalshi vs Chicago Fed model (lines)\n"
+        f"with Bloomberg Consensus forecasts (bars) — as of {date_str}",
+        fontsize=13, fontweight="bold",
+    )
+
+    ax.legend(loc="upper right", fontsize=11, framealpha=0.95)
+
+    fig.tight_layout()
+    if save_path:
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save_path, dpi=200)
     plt.close(fig)
     return fig

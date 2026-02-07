@@ -37,7 +37,7 @@ python main.py --tilt-lambda -1.0 --cdf-shift -0.10 --baseline 4.4
 │   ├── plotting.py             # All plot types + Chicago Fed data loader
 │   └── utils.py                # Shared constants, monotonicity, aggregation
 ├── data/
-│   ├── raw/                    # Source data: Kalshi CSVs, Chicago Fed Excel
+│   ├── raw/                    # Source data: Kalshi CSVs, Chicago Fed Excel, BBG consensus
 │   └── processed/              # Output CSVs (fine-grid bins, categories)
 ├── figures/                    # Generated plots
 ├── keys/                       # RSA private key (gitignored)
@@ -61,6 +61,15 @@ python main.py --tilt-lambda -1.0 --cdf-shift -0.10 --baseline 4.4
 - **CDF shift**: F_δ(u) = F(u + δ). A simple parallel shift of the entire distribution by δ percentage points.
 - **Implied λ**: For a CDF-shifted distribution with mean μ_δ, the moment-based tilt parameter is λ = (μ_δ − μ₀) / σ₀².
 
+## Data Sources
+
+| File | Description |
+|------|-------------|
+| `data/raw/chi-labor-market-indicators.xlsx` | Chicago Fed Real-Time Unemployment Rate model probabilities |
+| `data/raw/bbg-consensus-forecast.xlsx` | Bloomberg consensus analyst forecasts for unemployment rate |
+| `data/raw/kalshi-price-history-*.csv` | Historical Kalshi contract prices (wide format) |
+| `data/raw/kalshi_strikes_*.csv` | Kalshi API strike snapshots (long format) |
+
 ## Outputs
 
 ### CSV files (in `data/processed/`)
@@ -80,7 +89,9 @@ python main.py --tilt-lambda -1.0 --cdf-shift -0.10 --baseline 4.4
 | `kalshi_vs_chifed_*.png` | Bars (Chicago Fed) + dashed line (Kalshi) with relative-odds box |
 | `kalshi_tilted_*.png` | Grouped bars: Kalshi vs tilted vs Chicago Fed |
 | `kalshi_combined_lines_*.png` | All-lines comparison: Kalshi, Chicago Fed, CDF-shifted, exp-tilted |
-| `kalshi_temporal_*.png` | Two Kalshi snapshots over time (live vs cached baseline) |
+| `kalshi_temporal_*.png` | Multiple Kalshi snapshots over time (supports 3+ dates) |
+| `bbg_consensus_*.png` | Bloomberg consensus unemployment rate forecast histogram |
+| `kalshi_chifed_bbg_*.png` | Combined Kalshi + Chicago Fed lines with BBG consensus bars |
 
 ## API Setup
 
